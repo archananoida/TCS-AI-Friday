@@ -29,3 +29,21 @@ test("AI provider failure returns safe fallback",async()=>{
  finally{global.fetch=oldFetch;if(oldKey===undefined)delete process.env.OPENAI_API_KEY;else process.env.OPENAI_API_KEY=oldKey}
 });
 test("non-GET request is rejected",async()=>{let status=200;await handler({method:"POST",url:"/api/pipelines"},{setHeader(){},status(n){status=n;return this},json(){}});assert.equal(status,405)});
+
+test("all five pipelines have valid investigation and diagnosis",async()=>{
+ const pipelines=(await call("/api/pipelines")).data;
+ for(const p of pipelines){
+  const investigation=await call("/api/analyze/"+p.id),diagnosis=await call("/api/diagnose/"+p.id);
+  assert.equal(investigation.status,200);assert.equal(diagnosis.status,200);
+  assert.equal(investigation.data.pipeline_id,p.id);assert.equal(diagnosis.data.pipeline_id,p.id);
+  assert.equal(investigation.data.requires_human_approval,true);
+  assert.equal(diagnosis.data.verified,false);
+ }
+});
+test("filtered logs and missing routes behave correctly",async()=>{
+ const logs=(await call("/api/logs?pipeline_id=billing_export&level=ERROR")).data;
+ assert.equal(logs.length,1);assert.equal(logs[0].id,3);
+ assert.equal((await call("/api/diagnose/not-a-pipeline")).status,404);
+ assert.equal((await call("/api/ai-explain/not-a-pipeline")).status,404);
+ assert.equal((await call("/api/not-a-route")).status,404);
+});
