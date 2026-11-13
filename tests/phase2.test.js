@@ -47,3 +47,20 @@ test("filtered logs and missing routes behave correctly",async()=>{
  assert.equal((await call("/api/ai-explain/not-a-pipeline")).status,404);
  assert.equal((await call("/api/not-a-route")).status,404);
 });
+
+test("Phase 3 severity and downstream impact are deterministic",async()=>{
+ const transform=(await call("/api/triage/customers_transform")).data;
+ assert.equal(transform.priority,"P1");
+ assert.equal(transform.severity,"high");
+ assert.ok(transform.impacted_downstream.includes("warehouse_load"));
+ assert.ok(transform.impacted_downstream.includes("billing_export"));
+ assert.equal(transform.verified,false);
+ assert.equal(transform.requires_human_approval,true);
+ assert.equal(transform.timeline[0].stage,"detected");
+});
+test("Phase 3 healthy pipeline and invalid pipeline",async()=>{
+ const healthy=(await call("/api/triage/orders_ingest")).data;
+ assert.equal(healthy.priority,"none");
+ assert.equal(healthy.severity,"none");
+ assert.equal((await call("/api/triage/unknown")).status,404);
+});
