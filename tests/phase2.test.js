@@ -81,3 +81,22 @@ test("Phase 3 triage incident timeline has stable order",async()=>{
  assert.deepEqual(r.timeline.map(e=>e.sequence),[1,2]);
  assert.equal(r.incident_id,"INC-101");
 });
+
+test("healthy pipelines explain success without false incident",async()=>{
+ for(const id of ["orders_ingest","inventory_sync"]){
+  const d=(await call("/api/diagnose/"+id)).data;
+  assert.equal(d.cause,"No issues detected");assert.equal(d.requires_human_approval,false);
+  const a=(await call("/api/analyze/"+id)).data;assert.equal(a.confidence,null);
+  const ai=(await call("/api/ai-explain/"+id)).data;assert.equal(ai.ai_status,"not_applicable");
+ }
+});
+test("blocked pipeline points to failed upstream",async()=>{
+ const d=(await call("/api/diagnose/warehouse_load")).data;
+ assert.equal(d.cause,"Blocked by upstream dependency");
+ assert.ok(d.failed_upstream.includes("customers_transform"));
+ assert.ok(d.recommendation.includes("Customer Transform"));
+});
+test("failed pipelines retain evidence-backed diagnoses",async()=>{
+ assert.equal((await call("/api/diagnose/customers_transform")).data.evidence_log_ids[0],1);
+ assert.equal((await call("/api/diagnose/billing_export")).data.evidence_log_ids[0],3);
+});
