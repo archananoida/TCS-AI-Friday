@@ -35,6 +35,26 @@ function analyze(id){
  return {pipeline_id:id,engine:"evidence-rules",generative_ai_enabled:false,summary:p.name+" is "+p.status+". "+d.cause+".",hypothesis:d.cause,confidence,confidence_basis:d.evidence_log_ids.length?"Matching synthetic log signature; not an independently verified cause":"No matching error signature",recommended_steps:[d.recommendation,"Review linked evidence and verify the hypothesis before taking action."],evidence:own.filter(x=>d.evidence_log_ids.includes(x.id)),upstream,immediate_downstream_impact:impact,similar_incidents:related,verified:false,requires_human_approval:true};
 }
 
+
+// Phase 3: deterministic incident triage. Synthetic, read-only, and auditable.
+const incidentTimeline=[
+ {event_id:"EV-101",incident_id:"INC-101",sequence:1,stage:"detected",detail:"Synthetic null customer_id detected in transform input"},
+ {event_id:"EV-102",incident_id:"INC-101",sequence:2,stage:"investigating",detail:"Mapped log #1 to null constraint hypothesis"},
+ {event_id:"EV-201",incident_id:"INC-102",sequence:1,stage:"detected",detail:"Synthetic billing endpoint timeout logged"},
+ {event_id:"EV-202",incident_id:"INC-102",sequence:2,stage:"investigating",detail:"Checked upstream dependency chain"},
+ {event_id:"EV-301",incident_id:"INC-103",sequence:1,stage:"detected",detail:"Warehouse load blocked by failed upstream transform"}
+];
+function triage(id){
+ const p=pipelines.find(x=>x.id===id);if(!p)return null;
+ const analysis=analyze(id);
+ const incident=history.find(x=>x.pipeline_id===id);
+ const downstream=new Set();
+ function collect(parent){for(const child of pipelines.filter(x=>x.depends_on.includes(parent))){if(!downstream.has(child.id)){downstream.add(child.id);collect(child.id)}}}
+ collect(id);
+ const severity=p.status==="healthy"?"none":p.status==="failed"&&downstream.size?"high":p.status==="failed"?"medium":"medium";
+ return {pipeline_id:id,status:p.status,severity,priority:severity==="high"?"P1":severity==="medium"?"P2":"none",impacted_downstream:[...downstream],incident_id:incident?.incident_id||null,timeline:incidentTimeline.filter(x=>x.incident_id===incident?.incident_id),next_action:analysis.recommended_steps[0],severity_basis:"Deterministic demo rule: failed pipeline with downstream dependents is high; other failures or blocks are medium.",verified:false,requires_human_approval:true,synthetic:true};
+}
+
 async function aiExplain(id){
  const context=analyze(id);if(!context)return {status:404,body:{error:"Pipeline not found"}};
  const key=process.env.OPENAI_API_KEY;
@@ -55,4 +75,4 @@ async function aiExplain(id){
  }catch(e){if(e.name==="AbortError")reason="timeout";console.warn("OpenAI fallback category:",reason);return {status:200,body:{...context,ai_status:"fallback",ai_error_category:reason,ai_explanation:null,message:"OpenAI analysis unavailable ("+reason+"); evidence-based investigation retained."}}}finally{clearTimeout(timer)}
 }
 
-module.exports=async(req,res)=>{res.setHeader("Cache-Control","no-store");if(req.method!=="GET")return res.status(405).json({error:"Method not allowed"});const u=new URL(req.url,"https://localhost");const path=u.searchParams.has("requested")?"/api/"+u.searchParams.get("requested"):u.pathname;if(path==="/api/health")return res.status(200).json({status:"ok",mode:"synthetic"});if(path==="/api/pipelines")return res.status(200).json(pipelines);if(path.startsWith("/api/analyze/")){const d=analyze(decodeURIComponent(path.slice("/api/analyze/".length)));return d?res.status(200).json(d):res.status(404).json({error:"Pipeline not found"});}if(path.startsWith("/api/ai-explain/")){const result=await aiExplain(decodeURIComponent(path.slice("/api/ai-explain/".length)));return res.status(result.status).json(result.body);}if(path==="/api/incidents")return res.status(200).json(history);if(path==="/api/logs"){const rows=logs.filter(l=>(!u.searchParams.get("pipeline_id")||l.pipeline_id.toLowerCase()===u.searchParams.get("pipeline_id").toLowerCase())&&(!u.searchParams.get("level")||l.level.toLowerCase()===u.searchParams.get("level").toLowerCase())&&l.message.toLowerCase().includes((u.searchParams.get("q")||"").toLowerCase()));return res.status(200).json(rows);}if(path.startsWith("/api/diagnose/")){const d=diagnose(decodeURIComponent(path.slice("/api/diagnose/".length)));return d?res.status(200).json(d):res.status(404).json({error:"Pipeline not found"});}return res.status(404).json({error:"Not found"});};
+module.exports=async(req,res)=>{res.setHeader("Cache-Control","no-store");if(req.method!=="GET")return res.status(405).json({error:"Method not allowed"});const u=new URL(req.url,"https://localhost");const path=u.searchParams.has("requested")?"/api/"+u.searchParams.get("requested"):u.pathname;if(path==="/api/health")return res.status(200).json({status:"ok",mode:"synthetic"});if(path==="/api/pipelines")return res.status(200).json(pipelines);if(path.startsWith("/api/analyze/")){const d=analyze(decodeURIComponent(path.slice("/api/analyze/".length)));return d?res.status(200).json(d):res.status(404).json({error:"Pipeline not found"});}if(path.startsWith("/api/ai-explain/")){const result=await aiExplain(decodeURIComponent(path.slice("/api/ai-explain/".length)));return res.status(result.status).json(result.body);}if(path.startsWith("/api/triage/")){const t=triage(decodeURIComponent(path.slice("/api/triage/".length)));return t?res.status(200).json(t):res.status(404).json({error:"Pipeline not found"});}if(path==="/api/incidents")return res.status(200).json(history);if(path==="/api/logs"){const rows=logs.filter(l=>(!u.searchParams.get("pipeline_id")||l.pipeline_id.toLowerCase()===u.searchParams.get("pipeline_id").toLowerCase())&&(!u.searchParams.get("level")||l.level.toLowerCase()===u.searchParams.get("level").toLowerCase())&&l.message.toLowerCase().includes((u.searchParams.get("q")||"").toLowerCase()));return res.status(200).json(rows);}if(path.startsWith("/api/diagnose/")){const d=diagnose(decodeURIComponent(path.slice("/api/diagnose/".length)));return d?res.status(200).json(d):res.status(404).json({error:"Pipeline not found"});}return res.status(404).json({error:"Not found"});};
