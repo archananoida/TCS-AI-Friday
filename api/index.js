@@ -18,7 +18,16 @@ const rules=[
 ["dependency","Upstream dependency failure","Inspect and recover upstream pipeline before retrying downstream."],
 ["schema","Schema mismatch","Compare schemas and validate field types."],
 ["file not found","Missing source file","Check source path, schedule and permissions."]];
-function diagnose(id){if(!pipelines.some(p=>p.id===id))return null;for(const l of logs){if(l.pipeline_id!==id||!["ERROR","WARN"].includes(l.level))continue;for(const [pattern,cause,recommendation] of rules){if(l.message.toLowerCase().includes(pattern))return {pipeline_id:id,cause,recommendation,evidence_log_ids:[l.id],verified:false,requires_human_approval:true};}}return {pipeline_id:id,cause:"Insufficient evidence",recommendation:"Review additional logs and dependencies.",evidence_log_ids:[],verified:false,requires_human_approval:true};}
+function diagnose(id){
+ const p=pipelines.find(x=>x.id===id);if(!p)return null;
+ if(p.status==="healthy")return {pipeline_id:id,cause:"No issues detected",recommendation:p.id==="orders_ingest"?"Orders ingestion completed successfully: 5,000 synthetic orders processed. No corrective action required.":"Inventory synchronization completed successfully. No corrective action required.",evidence_log_ids:logs.filter(l=>l.pipeline_id===id&&l.level==="INFO").map(l=>l.id),verified:false,requires_human_approval:false,diagnosis_type:"healthy"};
+ if(p.status==="blocked"){
+  const failedParents=p.depends_on.filter(parent=>pipelines.some(x=>x.id===parent&&x.status==="failed"));
+  return {pipeline_id:id,cause:"Blocked by upstream dependency",recommendation:"Warehouse loading cannot proceed while Customer Transform is failing. Investigate the upstream null customer_id error before retrying the load.",evidence_log_ids:logs.filter(l=>l.pipeline_id===id&&l.level==="WARN").map(l=>l.id),verified:false,requires_human_approval:true,diagnosis_type:"blocked",failed_upstream:failedParents};
+ }
+ for(const l of logs){if(l.pipeline_id!==id||!["ERROR","WARN"].includes(l.level))continue;for(const [pattern,cause,recommendation] of rules){if(l.message.toLowerCase().includes(pattern))return {pipeline_id:id,cause,recommendation,evidence_log_ids:[l.id],verified:false,requires_human_approval:true,diagnosis_type:"hypothesis"};}}
+ return {pipeline_id:id,cause:"Insufficient evidence — investigation required",recommendation:"Review error logs, recent execution history and upstream dependencies before concluding the cause.",evidence_log_ids:[],verified:false,requires_human_approval:true,diagnosis_type:"unknown"};
+}
 
 const history=[
 {incident_id:"INC-101",pipeline_id:"customers_transform",symptom:"customer_id cannot be null",resolution:"Correct source mapping and quarantine incomplete rows"},
@@ -31,8 +40,8 @@ function analyze(id){
  const upstream=[];const seen=new Set();function walk(x){for(const parent of x.depends_on){if(seen.has(parent))continue;seen.add(parent);const node=pipelines.find(y=>y.id===parent);if(node){upstream.push({id:node.id,status:node.status});walk(node)}}}walk(p);
  const related=history.filter(x=>x.pipeline_id===id||x.symptom.toLowerCase().includes(d.cause.toLowerCase()));
  const impact=pipelines.filter(x=>x.depends_on.includes(id)).map(x=>x.id);
- const confidence=d.evidence_log_ids.length? (upstream.some(x=>x.status==="failed")?0.8:0.7):0.15;
- return {pipeline_id:id,engine:"evidence-rules",generative_ai_enabled:false,summary:p.name+" is "+p.status+". "+d.cause+".",hypothesis:d.cause,confidence,confidence_basis:d.evidence_log_ids.length?"Matching synthetic log signature; not an independently verified cause":"No matching error signature",recommended_steps:[d.recommendation,"Review linked evidence and verify the hypothesis before taking action."],evidence:own.filter(x=>d.evidence_log_ids.includes(x.id)),upstream,immediate_downstream_impact:impact,similar_incidents:related,verified:false,requires_human_approval:true};
+ const confidence=p.status==="healthy"?null:d.evidence_log_ids.length? (upstream.some(x=>x.status==="failed")?0.8:0.7):0.15;
+ return {pipeline_id:id,engine:"evidence-rules",generative_ai_enabled:false,summary:p.name+" is "+p.status+". "+d.cause+".",hypothesis:d.cause,confidence,confidence_basis:p.status==="healthy"?"No error detected; no incident hypothesis required":d.evidence_log_ids.length?"Matching synthetic log signature; not an independently verified cause":"No matching error signature",recommended_steps:[d.recommendation,"Review linked evidence and verify the hypothesis before taking action."],evidence:own.filter(x=>d.evidence_log_ids.includes(x.id)),upstream,immediate_downstream_impact:impact,similar_incidents:related,verified:false,requires_human_approval:true};
 }
 
 
@@ -57,6 +66,7 @@ function triage(id){
 
 async function aiExplain(id){
  const context=analyze(id);if(!context)return {status:404,body:{error:"Pipeline not found"}};
+ if(pipelines.find(x=>x.id===id)?.status==="healthy")return {status:200,body:{...context,ai_status:"not_applicable",ai_explanation:null,message:"Pipeline is healthy. No incident requires AI investigation."}};
  const key=process.env.OPENAI_API_KEY;
  if(!key)return {status:200,body:{...context,ai_status:"not_configured",ai_explanation:null,message:"OpenAI API key is not configured."}};
  const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),20000);
