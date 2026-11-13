@@ -65,3 +65,14 @@ The `GET /api/triage/:pipeline_id` endpoint returns deterministic severity/prior
 ## Acceptance status
 
 GitHub CI runs Node 22 and Python 3.12 tests. Production deployment readiness alone is not evidence of test success. The live OpenAI key is intentionally excluded from automated tests; mocked AI responses test safe success and failure handling. A browser download of the HTML incident report and the live OpenAI authentication check are separate manual acceptance items.
+
+## Offline laptop presentation (VS Code)
+
+1. Download the latest `main` ZIP from GitHub and extract it.
+2. In VS Code, open the extracted folder containing `local-server.js`, `api`, and `public`.
+3. Open Terminal and run `node local-server.js` (Node.js 22+; no npm install).
+4. Visit `http://localhost:3000`. Keep the terminal open throughout the presentation.
+5. The synthetic monitoring, diagnosis, triage and HTML report download work without internet or an API key. **Explain with AI** requires an approved OpenAI key and internet access, and is not part of the offline demo.
+6. Press Ctrl+C in the terminal to stop the server.
+
+If port 3000 is busy, in PowerShell run `$env:PORT=3001; node local-server.js`, then visit `http://localhost:3001`.
