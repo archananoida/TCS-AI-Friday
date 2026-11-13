@@ -7,7 +7,7 @@ A generic, synthetic data pipeline monitoring and troubleshooting demonstration.
 - Dependency listings and searchable execution logs
 - Evidence-linked, deterministic troubleshooting recommendations
 - Read-only incident investigation, dependency tracing and historical synthetic incidents
-- Downloadable JSON incident report with evidence and optional AI explanation
+- Downloadable JSON incident report with evidence, Phase 3 triage, severity, priority, timeline and optional AI explanation
 - Optional OpenAI Responses API analysis; no automatic repairs or real enterprise data
 
 ## Run locally
@@ -57,3 +57,11 @@ PipelineIQ uses synthetic evidence and rule-based diagnosis by default. To activ
 7. **Explain with AI** is optional and must be tested separately with an approved company API key; a fallback does not count as an AI PASS.
 
 All confidence scores are heuristics, not calibrated probabilities. All recommendations remain unverified and require human approval. This demo does not authenticate users, store audit records, or connect to production monitoring systems.
+
+## Phase 3 — incident operations (synthetic)
+
+The `GET /api/triage/:pipeline_id` endpoint returns deterministic severity/priority, transitive downstream impact, and a synthetic incident timeline. The incident report export includes the triage result. P1/P2 classifications are demonstration heuristics, not production service-level policy. There are no write operations, automated remediations, notifications or real incident state transitions.
+
+## Acceptance status
+
+GitHub CI runs Node 22 and Python 3.12 tests. Production deployment readiness alone is not evidence of test success. The live OpenAI key is intentionally excluded from automated tests; mocked AI responses test safe success and failure handling. A browser download of the JSON incident report and the live OpenAI authentication check are separate manual acceptance items.
