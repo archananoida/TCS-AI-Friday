@@ -9,4 +9,4 @@ test("upstream dependencies",async()=>{let x=(await call("/api/analyze/warehouse
 test("unknown pipeline",async()=>assert.equal((await call("/api/analyze/missing")).status,404));
 test("log search",async()=>assert.equal((await call("/api/logs?q=timeout")).data[0].id,3));
 test("history",async()=>assert.ok((await call("/api/incidents")).data.length>=3));
-test("AI without key returns honest fallback",async()=>{const old=process.env.GEMINI_API_KEY;delete process.env.GEMINI_API_KEY;try{const x=(await call("/api/ai-explain/billing_export")).data;assert.equal(x.ai_status,"not_configured");assert.equal(x.ai_explanation,null);assert.equal(x.evidence[0].id,3);}finally{if(old!==undefined)process.env.GEMINI_API_KEY=old;}});
+test("AI without key returns honest fallback",async()=>{const old=process.env.OPENAI_API_KEY;delete process.env.OPENAI_API_KEY;try{const x=(await call("/api/ai-explain/billing_export")).data;assert.equal(x.ai_status,"not_configured");assert.equal(x.ai_explanation,null);assert.equal(x.evidence[0].id,3);}finally{if(old!==undefined)process.env.OPENAI_API_KEY=old;}});
