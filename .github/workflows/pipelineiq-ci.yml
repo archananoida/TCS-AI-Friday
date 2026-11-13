@@ -1,0 +1,35 @@
+name: PipelineIQ CI
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile source
+        run: python -m compileall -q backend tests
+      - name: Unit tests
+        run: python -m unittest discover -s tests -v
+      - name: HTTP smoke test
+        run: |
+          python -m backend.app &
+          pid=$!
+          trap 'kill $pid' EXIT
+          python - <<'PY'
+          import json,time,urllib.request
+          for attempt in range(30):
+              try:
+                  with urllib.request.urlopen('http://127.0.0.1:8000/api/health',timeout=2) as r:
+                      assert json.load(r)['status']=='ok'
+                  break
+              except Exception:
+                  time.sleep(.2)
+          else: raise RuntimeError('API startup failed')
+          with urllib.request.urlopen('http://127.0.0.1:8000/') as r:
+              assert b'PipelineIQ' in r.read()
+          PY
