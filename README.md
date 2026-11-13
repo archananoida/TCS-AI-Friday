@@ -7,7 +7,7 @@ A generic, synthetic data pipeline monitoring and troubleshooting demonstration.
 - Dependency listings and searchable execution logs
 - Evidence-linked, deterministic troubleshooting recommendations
 - Read-only incident investigation, dependency tracing and historical synthetic incidents
-- Downloadable JSON incident report with evidence, Phase 3 triage, severity, priority, timeline and optional AI explanation
+- Downloadable human-readable HTML incident report (printable to PDF) with evidence, Phase 3 triage, severity, priority, timeline and optional AI explanation
 - Optional OpenAI Responses API analysis; no automatic repairs or real enterprise data
 
 ## Run locally
@@ -53,7 +53,7 @@ PipelineIQ uses synthetic evidence and rule-based diagnosis by default. To activ
 3. Select Warehouse Load to see the failed upstream dependency.
 4. Select Billing Export to see the timeout, historical case INC-102, and its upstream chain.
 5. Search for `timeout` in logs and inspect evidence #3.
-6. Click **Download incident report** to save a JSON evidence package locally.
+6. Click **Download incident report** to save a readable HTML report locally, then use Print / Save as PDF.
 7. **Explain with AI** is optional and must be tested separately with an approved company API key; a fallback does not count as an AI PASS.
 
 All confidence scores are heuristics, not calibrated probabilities. All recommendations remain unverified and require human approval. This demo does not authenticate users, store audit records, or connect to production monitoring systems.
@@ -64,4 +64,4 @@ The `GET /api/triage/:pipeline_id` endpoint returns deterministic severity/prior
 
 ## Acceptance status
 
-GitHub CI runs Node 22 and Python 3.12 tests. Production deployment readiness alone is not evidence of test success. The live OpenAI key is intentionally excluded from automated tests; mocked AI responses test safe success and failure handling. A browser download of the JSON incident report and the live OpenAI authentication check are separate manual acceptance items.
+GitHub CI runs Node 22 and Python 3.12 tests. Production deployment readiness alone is not evidence of test success. The live OpenAI key is intentionally excluded from automated tests; mocked AI responses test safe success and failure handling. A browser download of the HTML incident report and the live OpenAI authentication check are separate manual acceptance items.
