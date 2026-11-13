@@ -80,6 +80,7 @@ async function aiExplain(id){
   const request=useChat
    ?{model,messages:[{role:"system",content:instructions+" Respond ONLY with a JSON object with keys summary, possible_root_cause, next_checks (array of strings), uncertainty."},{role:"user",content:JSON.stringify(context)}],max_tokens:900}
    :{model,instructions,input:JSON.stringify(context),max_output_tokens:900,store:false,text:{format:{type:"json_schema",name:"incident_analysis",strict:true,schema}}};
+  console.info("AI request configuration:",JSON.stringify({endpoint:base+(useChat?"/v1/chat/completions":"/v1/responses"),model,api_style:useChat?"chat_completions":"responses",key_present:Boolean(key),key_length:key.length}));
   const response=await fetch(base+(useChat?"/v1/chat/completions":"/v1/responses"),{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},body:JSON.stringify(request),signal:controller.signal});
   if(!response.ok){reason=({400:"request_rejected",401:"authentication_failed",403:"access_denied",404:"model_unavailable",429:"rate_or_quota_limit"})[response.status]||(response.status>=500?"provider_server_error":"provider_http_error");console.warn("OpenAI analysis failure category:",reason,"HTTP status:",response.status);throw Error("Provider returned non-success");}
   const payload=await response.json();
