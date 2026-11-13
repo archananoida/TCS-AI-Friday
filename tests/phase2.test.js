@@ -64,3 +64,20 @@ test("Phase 3 healthy pipeline and invalid pipeline",async()=>{
  assert.equal(healthy.severity,"none");
  assert.equal((await call("/api/triage/unknown")).status,404);
 });
+
+test("Phase 3 all pipeline triage contracts",async()=>{
+ for(const p of (await call("/api/pipelines")).data){
+  const r=await call("/api/triage/"+p.id);
+  assert.equal(r.status,200);
+  assert.equal(r.data.pipeline_id,p.id);
+  assert.equal(r.data.synthetic,true);
+  assert.equal(r.data.requires_human_approval,true);
+  assert.ok(["none","P1","P2"].includes(r.data.priority));
+  assert.ok(Array.isArray(r.data.timeline));
+ }
+});
+test("Phase 3 triage incident timeline has stable order",async()=>{
+ const r=(await call("/api/triage/customers_transform")).data;
+ assert.deepEqual(r.timeline.map(e=>e.sequence),[1,2]);
+ assert.equal(r.incident_id,"INC-101");
+});
