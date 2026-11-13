@@ -16,7 +16,8 @@ jobs:
       - name: Unit tests
         run: python -m unittest discover -s tests -v
       - name: Phase 2 API tests
-        run: node --test tests/phase2.test.js\n      - name: HTTP smoke test
+        run: node --check api/index.js && node --test tests/phase2.test.js
+      - name: HTTP smoke test
         run: |
           python -m backend.app &
           pid=$!
